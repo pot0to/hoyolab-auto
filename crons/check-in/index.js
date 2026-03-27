@@ -2,7 +2,7 @@ module.exports = {
 	name: "check-in",
 	expression: "0 0 0 * * *",
 	description: "Run daily check-in every day at midnight or your specified time",
-	code: (async function checkIn() {
+	code: (async function checkIn () {
 		const accounts = app.HoyoLab.getActiveAccounts();
 		if (accounts.length === 0) {
 			app.Logger.warn("Cron:CheckIn", "No active accounts found for HoyoLab");
@@ -12,7 +12,6 @@ module.exports = {
 		const messages = [];
 		const allAccountData = [];
 		const activeGameAccounts = app.HoyoLab.getActivePlatform();
-		
 		for (const name of activeGameAccounts) {
 			const platform = app.HoyoLab.get(name);
 			const execution = await platform.checkIn();
