@@ -38,21 +38,26 @@ const cookieRefreshBaseUrl = process.env.COOKIE_REFRESH_BASE_URL || `http://loca
 let botStatus = {
 	version: require("./package.json").version,
 	cookieStatus: {},
-	characters: {}
+	characters: []
 };
 
 function getOrInitializeCharacter(gameType, uid, username, region) {
-	if (!botStatus.characters[gameType]) {
-		botStatus.characters[gameType] = {};
-	}
-	if (!botStatus.characters[gameType][uid]) {
-		botStatus.characters[gameType][uid] = {
+	// Find existing character
+	let character = botStatus.characters.find(char => char.platform === gameType && char.uid === uid);
+	
+	if (!character) {
+		// Create new character
+		character = {
+			platform: gameType,
+			uid: uid,
 			username: username,
 			region: region,
 			runs: []
 		};
+		botStatus.characters.push(character);
 	}
-	return botStatus.characters[gameType][uid];
+	
+	return character;
 }
 
 function getOrInitializeDailyRun(character, date) {
@@ -62,7 +67,11 @@ function getOrInitializeDailyRun(character, date) {
 		todayRun = {
 			date: date,
 			lastRunTimestamp: new Date().toISOString(),
-			redeems: []
+			redeems: [],
+			todaySummary: {
+				totalSignIns: 0,
+				todaysRewards: {}
+			}
 		};
 		character.runs.push(todayRun);
 		// Keep only last 30 days
@@ -82,9 +91,6 @@ function updateBotStatus(type, data) {
 	const today = new Date().toISOString().split('T')[0];
 
 	if (type === 'checkIn') {
-		// Update today's summary
-		botStatus.todaySummary.totalCheckIns += data.totalAccounts;
-		
 		// Track each character's check-in results
 		data.results.forEach(result => {
 			const character = getOrInitializeCharacter(result.platform, result.uid, result.username, result.region);
@@ -99,11 +105,18 @@ function updateBotStatus(type, data) {
 				result: result.result
 			});
 			
-			// Update summary counters
+			// Update per-character summary for successful check-ins only
 			if (result.result.includes("Congratulations") || result.result.includes("successfully")) {
-				botStatus.todaySummary.successfulCheckIns++;
-			} else {
-				botStatus.todaySummary.failedCheckIns++;
+				dailyRun.todaySummary.totalSignIns++;
+				
+				// Aggregate today's rewards
+				const rewardName = result.rewardName || result.reward;
+				const rewardCount = result.rewardCount || 1;
+				if (dailyRun.todaySummary.todaysRewards[rewardName]) {
+					dailyRun.todaySummary.todaysRewards[rewardName] += rewardCount;
+				} else {
+					dailyRun.todaySummary.todaysRewards[rewardName] = rewardCount;
+				}
 			}
 		});
 	}
@@ -139,7 +152,6 @@ function updateBotStatus(type, data) {
 			lastChecked: new Date().toISOString(),
 			message: 'Cookie expired - manual refresh required'
 		};
-		botStatus.todaySummary.expiredCookies++;
 	}
 	else if (type === 'cookieValid') {
 		botStatus.cookieStatus[data.uid] = {
@@ -342,8 +354,25 @@ function startCookieRefreshServer () {
 		}
 
 		if (parsed.pathname === "/status" && req.method === "GET") {
+			// Format today's rewards as a single string per character
+			const formattedStatus = {
+				...botStatus,
+				characters: botStatus.characters.map(char => ({
+					...char,
+					runs: char.runs.map(run => ({
+						...run,
+						todaySummary: {
+							totalSignIns: run.todaySummary.totalSignIns,
+							todaysRewards: Object.entries(run.todaySummary.todaysRewards)
+								.map(([item, count]) => `${item} x${count}`)
+								.join(", ")
+						}
+					}))
+				}))
+			};
+
 			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(JSON.stringify(botStatus, null, 2));
+			res.end(JSON.stringify(formattedStatus, null, 2));
 			return;
 		}
 

@@ -12,6 +12,7 @@ module.exports = {
 		const messages = [];
 		const allAccountData = [];
 		const activeGameAccounts = app.HoyoLab.getActivePlatform();
+		
 		for (const name of activeGameAccounts) {
 			const platform = app.HoyoLab.get(name);
 			const execution = await platform.checkIn();
@@ -21,7 +22,7 @@ module.exports = {
 			
 			// Only add to messages for notifications if there are results
 			if (execution.length === 0) {
-				app.Logger.info("Cron:CheckIn", `All accounts for ${name} either signed in or failed to sign in`);
+				app.Logger.info("Cron:CheckIn", "All accounts for ${name} either signed in or failed to sign in");
 				continue;
 			}
 
@@ -33,7 +34,7 @@ module.exports = {
 			return;
 		}
 
-		// --- Notification Loop (Fixed Duplication) ---
+		// --- Notification Loop ---
 		for (let i = 0; i < messages.length; i++) {
 			const message = messages[i];
 
