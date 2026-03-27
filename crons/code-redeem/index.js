@@ -84,5 +84,36 @@ module.exports = {
 				await webhook.send(message.embed);
 			}
 		}
+
+		// --- Bot Status Update ---
+		if (app.CookieRefresh && typeof app.CookieRefresh.updateStatus === "function") {
+			for (const data of success) {
+				const account = data.account || {};
+				app.CookieRefresh.updateStatus('redeem', {
+					gameType: account.platform,
+					uid: account.uid,
+					username: account.username,
+					region: account.region,
+					code: data.code?.code || data.code,
+					item: data.code?.name || 'Unknown Item',
+					status: 'success',
+					timestamp: new Date().toISOString()
+				});
+			}
+
+			for (const data of failed) {
+				const account = data.account || {};
+				app.CookieRefresh.updateStatus('redeem', {
+					gameType: account.platform,
+					uid: account.uid,
+					username: account.username,
+					region: account.region,
+					code: data.code?.code || data.code,
+					item: data.code?.name || 'Unknown Item',
+					status: 'failed',
+					timestamp: new Date().toISOString()
+				});
+			}
+		}
 	}
 };

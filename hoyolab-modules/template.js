@@ -46,7 +46,7 @@ module.exports = class HoyoLab {
 			});
 		}
 
-		for (const account of accounts) {
+		for (const [index, account] of accounts.entries()) {
 			if (typeof account.cookie === "object") {
 				throw new app.Error({
 					message: "This cookie method is deprecated, please follow the new cookie guide again: https://gist.github.com/torikushiii/59eff33fc8ea89dbc0b2e7652db9d3fd"
@@ -168,6 +168,7 @@ module.exports = class HoyoLab {
 			const ltuid = account.cookie.match(/ltuid(?:|_v2)=([^;]+)/)[1];
 
 			this.#data.push({
+				configIndex: index,
 				cookie: parsedCookie.cookie,
 				ltuid,
 				redeemCode: parsedCookie.codeRedeem !== false ? redeemCode : parsedCookie.codeRedeem,
@@ -276,6 +277,10 @@ module.exports = class HoyoLab {
 		return Object.entries(cookieObj)
 			.map(([key, value]) => `${key}=${value}`)
 			.join("; ");
+	}
+
+	static isCookieExpiredRetcode (retcode) {
+		return [-100, -10001, -1071].includes(retcode);
 	}
 
 	static parseCookie (cookie, options = {}) {
@@ -553,6 +558,25 @@ module.exports = class HoyoLab {
 			});
 
 			return { success: false };
+		}
+
+		if (res.body?.retcode !== undefined && res.body.retcode !== 0 && res.body.retcode !== 1) {
+			const isExpired = this.constructor.isCookieExpiredRetcode(res.body.retcode);
+			app.Logger.log(`${this.fullName}:UpdateCookie`, {
+				message: "Failed to update cookie",
+				args: {
+					platform: this.name,
+					uid: accountData.uid,
+					region: accountData.region,
+					retcode: res.body.retcode,
+					body: res.body
+				}
+			});
+
+			return {
+				success: false,
+				isExpired
+			};
 		}
 
 		const data = res.body.data;

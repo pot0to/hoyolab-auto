@@ -170,6 +170,25 @@ module.exports = class DiscordController extends require("./template.js") {
 		}
 	}
 
+	async sendDirectMessage (userId, content) {
+		if (!userId || !content) {
+			throw new app.Error({
+				message: "Invalid userId or content for Discord DM"
+			});
+		}
+
+		const user = await this.client.users.fetch(userId);
+		if (!user) {
+			throw new app.Error({
+				message: "Discord user not found for DM",
+				args: { userId }
+			});
+		}
+
+		const dmChannel = await user.createDM();
+		await dmChannel.send(content);
+	}
+
 	async handleCommand (data) {
 		const {
 			interaction,

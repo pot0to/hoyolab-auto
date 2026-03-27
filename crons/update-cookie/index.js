@@ -16,6 +16,31 @@ module.exports = {
 				continue;
 			}
 
+			if (!refreshCookie.success) {
+				if (refreshCookie.isExpired) {
+					account.cookieExpired = true;
+					app.Logger.warn("Cron:UpdateCookie", `${account.platform} account ${account.uid} cookie is expired or invalid. Please re-obtain a fresh cookie (see latest cookie guide) and update config.`);
+					if (app.CookieRefresh && typeof app.CookieRefresh.notifyCookieExpired === "function") {
+						await app.CookieRefresh.notifyCookieExpired(account);
+					}
+					if (app.CookieRefresh && typeof app.CookieRefresh.updateStatus === "function") {
+						app.CookieRefresh.updateStatus('cookieExpired', {
+							uid: account.uid,
+							platform: account.platform
+						});
+					}
+				}
+				continue;
+			}
+
+			// Cookie is valid
+			if (app.CookieRefresh && typeof app.CookieRefresh.updateStatus === "function") {
+				app.CookieRefresh.updateStatus('cookieValid', {
+					uid: account.uid,
+					platform: account.platform
+				});
+			}
+
 			const cookieData = app.HoyoLab.parseCookie(account.cookie, {
 				blacklist: ["cookie_token", "account_id"]
 			});

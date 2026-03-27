@@ -18,4 +18,6 @@ USER hoyolab
 
 ENV TZ=Asia/Shanghai
 
+EXPOSE 3002
+
 CMD ["npm", "start"]

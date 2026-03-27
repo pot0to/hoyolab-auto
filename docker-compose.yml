@@ -1,12 +1,14 @@
 services:
   instance:
-    image: ghcr.io/torikushiii/hoyolab-auto:latest
-    restart: on-failure:5
+    build: .
+    restart: unless-stopped
     container_name: hoyolab-auto
-    network_mode: bridge
     volumes:
       - ./config.json5:/app/config.json5:ro
       - ./data:/app/data
       - ./logs:/app/logs
     environment:
-      TZ: Asia/Shanghai
+      TZ: America/Los_Angeles
+      COOKIE_REFRESH_HOST: ""
+    ports:
+      - "3002:3002"

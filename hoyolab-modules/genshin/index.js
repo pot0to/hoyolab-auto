@@ -114,6 +114,7 @@ module.exports = class Genshin extends require("../template.js") {
 
 			const offset = app.HoyoLab.getRegion(data.region);
 			this.accounts.push({
+				configIndex: account.configIndex,
 				platform: this.name,
 				uid: data.game_role_id,
 				nickname: data.nickname,
