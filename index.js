@@ -105,17 +105,25 @@ function updateBotStatus(type, data) {
 				result: result.result
 			});
 			
-			// Update per-character summary for successful check-ins only
-			if (result.result.includes("Congratulations") || result.result.includes("successfully")) {
+			// Update per-character summary for successful check-ins and already-sign-in status
+			const resultText = (result.result || "").toLowerCase();
+			const signInDetected =
+				resultText.includes("congratulations") ||
+				resultText.includes("successfully") ||
+				resultText.includes("already checked in") ||
+				resultText.includes("already signed in") ||
+				resultText.includes("already checked in today") ||
+				resultText.includes("already signed in today");
+
+			if (signInDetected) {
 				dailyRun.todaySummary.totalSignIns++;
-				
+
 				// Aggregate today's rewards
 				const rewardName = result.rewardName || result.reward;
 				const rewardCount = result.rewardCount || 1;
-				if (dailyRun.todaySummary.todaysRewards[rewardName]) {
-					dailyRun.todaySummary.todaysRewards[rewardName] += rewardCount;
-				} else {
-					dailyRun.todaySummary.todaysRewards[rewardName] = rewardCount;
+				if (rewardName) {
+					dailyRun.todaySummary.todaysRewards[rewardName] =
+						(dailyRun.todaySummary.todaysRewards[rewardName] || 0) + rewardCount;
 				}
 			}
 		});
