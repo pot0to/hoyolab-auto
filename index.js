@@ -52,7 +52,7 @@ function getOrInitializeCharacter(gameType, uid, username, region) {
 			uid: uid,
 			username: username,
 			region: region,
-			runs: []
+			lastRun: null
 		};
 		botStatus.characters.push(character);
 	}
@@ -61,9 +61,8 @@ function getOrInitializeCharacter(gameType, uid, username, region) {
 }
 
 function getOrInitializeDailyRun(character, date) {
-	// Check if today's run already exists
-	let todayRun = character.runs.find(run => run.date === date);
-	if (!todayRun) {
+	let todayRun = character.lastRun;
+	if (!todayRun || todayRun.date !== date) {
 		todayRun = {
 			date: date,
 			lastRunTimestamp: new Date().toISOString(),
@@ -73,14 +72,14 @@ function getOrInitializeDailyRun(character, date) {
 				todaysRewards: {}
 			}
 		};
-		character.runs.push(todayRun);
-		// Keep only last 30 days
-		if (character.runs.length > 30) {
-			character.runs = character.runs.slice(-30);
-		}
+		character.lastRun = todayRun;
 	} else {
-		// Update the last run timestamp
 		todayRun.lastRunTimestamp = new Date().toISOString();
+		todayRun.redeems = [];
+		todayRun.todaySummary = {
+			totalSignIns: 0,
+			todaysRewards: {}
+		};
 	}
 	return todayRun;
 }
@@ -93,19 +92,7 @@ function updateBotStatus(type, data) {
 	if (type === 'checkIn') {
 		// Track each character's check-in results
 		data.results.forEach(result => {
-			const character = getOrInitializeCharacter(result.platform, result.uid, result.username, result.region);
-			const dailyRun = getOrInitializeDailyRun(character, today);
-			
-			// Add the check-in reward to today's redeems
-			dailyRun.redeems.push({
-				name: result.rewardName || result.reward,
-				count: result.rewardCount || 1,
-				source: 'checkIn',
-				timestamp: new Date().toISOString(),
-				result: result.result
-			});
-			
-			// Update per-character summary for successful check-ins and already-sign-in status
+			// Consider only success/non-failure results for lastRun storage
 			const resultText = (result.result || "").toLowerCase();
 			const signInDetected =
 				resultText.includes("congratulations") ||
@@ -115,18 +102,33 @@ function updateBotStatus(type, data) {
 				resultText.includes("already checked in today") ||
 				resultText.includes("already signed in today");
 
-			if (signInDetected) {
-				dailyRun.todaySummary.totalSignIns++;
-
-				// Aggregate today's rewards
-				const rewardName = result.rewardName || result.reward;
-				const rewardCount = result.rewardCount || 1;
-				if (rewardName) {
-					dailyRun.todaySummary.todaysRewards[rewardName] =
-						(dailyRun.todaySummary.todaysRewards[rewardName] || 0) + rewardCount;
-				}
+			if (!signInDetected) {
+				return; // skip storing failed or non-success check-in results
 			}
-		});
+
+			const character = getOrInitializeCharacter(result.platform, result.uid, result.username, result.region);
+			const dailyRun = getOrInitializeDailyRun(character, today);
+			
+			// Add the check-in reward to this successful lastRun
+			dailyRun.redeems.push({
+				name: result.rewardName || result.reward,
+				count: result.rewardCount || 1,
+				source: 'checkIn',
+				timestamp: new Date().toISOString(),
+				result: result.result
+			});
+			
+			// Update per-character summary for successful check-ins and already-sign-in status
+			dailyRun.todaySummary.totalSignIns++;
+
+			// Aggregate today's rewards
+			const rewardName = result.rewardName || result.reward;
+			const rewardCount = result.rewardCount || 1;
+			if (rewardName) {
+				dailyRun.todaySummary.todaysRewards[rewardName] =
+					(dailyRun.todaySummary.todaysRewards[rewardName] || 0) + rewardCount;
+				}
+			})
 	}
 	else if (type === 'redeem') {
 		// Track code redemptions per character
@@ -365,9 +367,12 @@ function startCookieRefreshServer () {
 			// Format today's rewards as a single string per character
 			const formattedStatus = {
 				...botStatus,
-				characters: botStatus.characters.map(char => ({
-					...char,
-					runs: char.runs.map(run => ({
+				characters: botStatus.characters.map(char => {
+					const run = char.lastRun;
+					if (!run) {
+						return { ...char, lastRun: null };
+					}
+					const formattedRun = {
 						...run,
 						todaySummary: {
 							totalSignIns: run.todaySummary.totalSignIns,
@@ -375,8 +380,12 @@ function startCookieRefreshServer () {
 								.map(([item, count]) => `${item} x${count}`)
 								.join(", ")
 						}
-					}))
-				}))
+					};
+					return {
+						...char,
+						lastRun: formattedRun
+					};
+				})
 			};
 
 			res.writeHead(200, { "Content-Type": "application/json" });
